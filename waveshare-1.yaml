@@ -1,0 +1,199 @@
+
+substitutions:
+  devicename: waveshare_1
+  friendname: waveshare_1
+# Change the timezone to suit your location, or even just remove it - it will likely be picked up automatically
+  timez: Europe/London
+  board: esp32-s3-devkitc-1
+# Display state on initial start
+# Note that the screensaver only starts after the first touch of the display
+# Change to ALWAYS_OFF if want the screen to be off after booting, ALWAYS_ON if want it on at start eg for initial troubleshooting
+  screenstart: ALWAYS_ON
+# Timeout for the screen
+  screensaver: 5 min
+#GPIO pins for the LCD screen
+  repin: GPIO14
+  dcpin: GPIO8
+# Note - you may see an error on compilation "WARNING GPIO2 is a Strapping PIN and should be avoided" - ignore this as you have no choice
+# This error message may be removed via the "ignore_strapping_warning" option for the screen driver
+  bkpin: GPIO2 # was 2 two
+  clpin: GPIO10
+  mopin: GPIO11
+  mipin: GPIO12
+  cspin: GPIO09
+# GPIO pins for the touch screen
+  sdapin: GPIO6
+  sclpin: GPIO7
+  intpin: GPIO5  
+  rstpin: GPIO13
+
+
+esphome:
+  name: $devicename
+  friendly_name: $friendname
+
+esp32:
+  board: $board
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "aFnY1qXaJIL9pfCYX/ohowAJDUJMhIo4Sgu5YzooEvY="
+
+ota:
+  - platform: esphome
+    password: password
+
+wifi:
+  ssid: !secret iot_ssid
+  password: !secret iot_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Round-Touchscreen"
+    password: password
+
+captive_portal:
+
+
+# BINARY SENSORS
+
+binary_sensor:
+  - platform: homeassistant
+    id: remote_light
+    entity_id: light.lamp
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_btn
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_fan
+    entity_id: fan.sonoff_1000cc2152
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: fan_btn
+          state:
+            checked: !lambda return x;
+
+
+spi:
+  mosi_pin: $mopin
+  clk_pin: $clpin
+  miso_pin: $mipin
+# Don't use software - makes it crawl  
+#  force_sw: True
+#mosi = Master Out Slave In
+#miso = Master In Slave Out or fermented bean paste. In this case, most likely the former rather than the latter. Doesn't matter as not used.
+
+i2c:
+  sda: $sdapin
+  scl: $sclpin
+  id: i2c_touch
+  #Following helped someone get rid of the "Components should block" error messages but didn't for me
+  #frequency: 400kHz
+
+# Define a PWM output on the ESP32
+output:
+  - platform: ledc
+    pin: $bkpin
+    id: backlight_pwm
+
+# Define a monochromatic, dimmable light for the backlight
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    name: "Display Backlight"
+    id: back_light
+    restore_mode: ALWAYS_ON
+
+# Optional: Add a simple display test
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+
+touchscreen:
+  platform: cst816
+  id: my_touchscreen
+  interrupt_pin: $intpin
+  reset_pin: $rstpin
+  display: main_display
+
+  on_touch:
+    - lambda: |-
+          ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+              touch.x,
+              touch.y,
+              touch.x_raw,
+              touch.y_raw
+              );
+
+lvgl:
+  touchscreens: my_touchscreen
+  bg_color: 0
+  align: center
+  color_depth: 16
+  widgets:
+    - button:
+        id: light_btn
+        x: 20
+        y: 80
+        width: 60
+        height: 60
+        checkable: true
+        widgets:
+          - label:
+              align: center
+              text: "Lamp"
+        on_click:
+          - homeassistant.service:
+              service: light.toggle
+              data:
+                entity_id: light.lamp
+
+    - button:
+        id: fan_btn
+        x: 80
+        y: 80
+        width: 60
+        height: 60
+        checkable: true
+        widgets:
+          - label:
+              align: center
+              text: "Fan"
+        on_click:
+          - homeassistant.service:
+              service: fan.toggle
+              data:
+                entity_id: fan.sonoff_1000cc2152
+
+
+
+
+display:
+  - platform: ili9xxx
+    model: GC9A01A #ST7789V
+    dc_pin: $dcpin
+    reset_pin: $repin
+    cs_pin: $cspin
+    invert_colors: true
+    auto_clear_enabled: false
+    update_interval: never
+    id: main_display
+ #   show_test_card: true
+    dimensions: 
+      height: 240
+      width: 240
+    rotation: 0
+    color_order: BGR
