@@ -1,4 +1,3 @@
-
 substitutions:
   devicename: waveshare_1
   friendname: waveshare_1
@@ -43,7 +42,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "aFnY1qXaJIL9pfCYX/ohowAJDUJMhIo4Sgu5YzooEvY="
+    key: ""
 
 ota:
   - platform: esphome
@@ -65,13 +64,83 @@ captive_portal:
 
 binary_sensor:
   - platform: homeassistant
-    id: remote_light
-    entity_id: light.lamp
+    id: remote_lightCeilingGroup
+    entity_id: light.ceiling_group
     publish_initial_state: true
     on_state:
       then:
         lvgl.widget.update:
-          id: light_btn
+          id: light_ceilingGroup
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightBedLeft
+    entity_id: light.lamp_nc
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_bedLeft
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightBedRight
+    entity_id: light.lamp_nc
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_bedRight
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightDeskGroup
+    entity_id: light.desk_lights
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_deskGroup
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightDeskLeft
+    entity_id: light.left
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_deskLeft
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightDeskRight
+    entity_id: light.Right
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_deskRight
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightTV
+    entity_id: light.hue_gradient_lightstrip_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_TV
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    id: remote_lightSkadie
+    entity_id: light.light_strip
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: light_skadis
           state:
             checked: !lambda return x;
   - platform: homeassistant
@@ -81,11 +150,28 @@ binary_sensor:
     on_state:
       then:
         lvgl.widget.update:
-          id: fan_btn
+          id: fan_toggle
           state:
             checked: !lambda return x;
+sensor:
+  - platform: homeassistant
+    id: room_thermostat
+    entity_id: sensor.temperature_5
+    on_value:
+      - lvgl.label.update:
+          id: screen_temp
+          text: !lambda return id(room_thermostat_text).state;
+      - lvgl.label.update:
+          id: mainMenu_temp
+          text: !lambda return id(room_thermostat_text).state;
 
-
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+  - platform: homeassistant
+    id: room_thermostat_text
+    entity_id: sensor.temperature_44
 spi:
   mosi_pin: $mopin
   clk_pin: $clpin
@@ -117,18 +203,12 @@ light:
     restore_mode: ALWAYS_ON
 
 # Optional: Add a simple display test
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: "IP Address"
 
 touchscreen:
   platform: cst816
   id: my_touchscreen
   interrupt_pin: $intpin
   reset_pin: $rstpin
-  display: main_display
-
   on_touch:
     - lambda: |-
           ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
@@ -143,44 +223,779 @@ lvgl:
   bg_color: 0
   align: center
   color_depth: 16
-  widgets:
-    - button:
-        id: light_btn
-        x: 20
-        y: 80
-        width: 60
-        height: 60
-        checkable: true
-        widgets:
-          - label:
-              align: center
-              text: "Lamp"
-        on_click:
-          - homeassistant.service:
-              service: light.toggle
-              data:
-                entity_id: light.lamp
+  on_idle:
+    - timeout: 30s
+      then:
+      - lvgl.page.show: screensaver
+    - timeout: 300s
+      then:
+        - light.turn_off: back_light
 
-    - button:
-        id: fan_btn
-        x: 80
-        y: 80
-        width: 60
-        height: 60
-        checkable: true
-        widgets:
-          - label:
-              align: center
-              text: "Fan"
-        on_click:
-          - homeassistant.service:
-              service: fan.toggle
-              data:
-                entity_id: fan.sonoff_1000cc2152
+  style_definitions:
+    - id: temp_style      # choose an ID for your definition
+      text_font: montserrat_48
+      align: center
+      text_color: 0xFFFFFF
+      radius: 4
+      pad_all: 2  
+  pages:
+    - id: screensaver
+      skip: true
+      widgets:
+        - label:
+            id: screen_temp
+            styles: temp_style
+            align: center
+      on_click:
+        - lvgl.page.show: main_menu
+        - light.turn_on: back_light
+    - id: main_menu      
+      widgets:
+        - button:
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "Lights"
+            on_click:
+              - lvgl.page.show: lights_page1
+        - button:
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Fan"
+            on_click:
+              - lvgl.page.show: fan_page
+        - button:
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "TV"
+            on_click:
+              - lvgl.page.show: tv_page
+        - button:
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "A/C"
+            on_click:
+              - lvgl.page.show: ac_page
+        - button:
+            x: 163
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF028"
+            on_click:
+              - lvgl.page.show: soundBar_page
+        - button:
+            x: 54
+            y: 157
+            width: 132
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  id: mainMenu_temp
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.lamp
+    - id: lights_page1
+      widgets:
+        - button:
+            id: light_ceilingGroup
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Ceiling"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.ceiling_group
+        - button:
+            id: light_bedLeft
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Bed Left"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.lamp_nc
+        - button:
+            id: light_bedRight
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Bed Right"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.lamp
+        - button:
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Scenes"
+            on_click:
+              - homeassistant.service:
+                  service: input_select.bedroom_room_scenes
+                  data:
+                    action:
+                      input_select.select_next
+        - button:
+            id: light_deskGroup
+            x: 163
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Desk Group"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.desk_lights
+        - button:
+            x: 54
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
+        - button:
+            x: 126
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF054"
+            on_click:
+              - lvgl.page.show: lights_page2
+    - id: lights_page2
+      widgets:
+        - button:
+            id: light_deskLeft
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "D Left"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.left
+        - button:
+            id: light_deskRight
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "D Right"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.right
+        - button:
+            id: light_TV
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "TV"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.hue_gradient_lightstrip_1
+        - button:
+            id: light_skadis
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Skadis"
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.light_strip
+        - button:
+            x: 54
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
+        - button:
+            x: 126
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF053"
+            on_click:
+              - lvgl.page.show: lights_page1
+    - id: fan_page
+      widgets:
+        - button:
+            id: fan_toggle
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Toggle"
+            on_click:
+              - homeassistant.service:
+                  service: fan.toggle
+                  data:
+                    entity_id: fan.sonoff_1000cc2152
+        - button:
+            id: fan_AP
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "AP"
+            on_click:
+              - homeassistant.service:
+                  service: button.press
+                  data:
+                    entity_id: button.uppatvind_button
+        - button:
+            id: fan_low
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "Low"
+            on_click:
+              - homeassistant.service:
+                  service: fan.set_preset_mode
+                  data:
+                    entity_id: fan.sonoff_1000cc2152
+                    preset_mode: low
+        - button:
+            id: fan_medium
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "Medium"
+            on_click:
+              - homeassistant.service:
+                  service: fan.set_preset_mode
+                  data:
+                    entity_id: fan.sonoff_1000cc2152
+                    preset_mode: medium
+        - button:
+            id: fan_high
+            x: 163
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "High"
+            on_click:
+              - homeassistant.service:
+                  service: fan.set_preset_mode
+                  data:
+                    entity_id: fan.sonoff_1000cc2152
+                    preset_mode: high
+        - button:
+            x: 54
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
+    - id: tv_page
+      widgets:
+        - button:
+            id: tv_toggle
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF011"
+            on_click:
+              - homeassistant.service:
+                  service: script.tvtogglemain
+        - button:
+            id: tv_enter
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF8A2"
+            on_click:
+              - homeassistant.service:
+                  service: webostv.button
+                  data:
+                    entity_id: media_player.seans_tv_2
+                    button: ENTER
+        - button:
+            id: tv_volumeDown
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF027"
+            on_click:
+              - homeassistant.service:
+                  service: webostv.button
+                  data:
+                    entity_id: media_player.seans_tv_2
+                    button: VOLUMEDOWN
+        - button:
+            id: tv_volumeUp
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF028"
+            on_click:
+              - homeassistant.service:
+                  service: webostv.button
+                  data:
+                    entity_id: media_player.seans_tv_2
+                    button: VOLUMEUP
+        - button:
+            id: tv_mute
+            x: 163
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF026"
+            on_click:
+              - homeassistant.service:
+                  service: webostv.button
+                  data:
+                    entity_id: media_player.seans_tv_2
+                    button: MUTE
+        - button:
+            x: 54
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
 
-
-
-
+    - id: ac_page
+      widgets:
+        - button:
+            id: ac_power
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF011"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: aircon
+                    command: power
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: ac_fanSpeed
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "FS"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: aircon
+                    command: fan_speed
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: ac_mode
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF021"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: aircon
+                    command: mode
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: ac_up
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF077"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: aircon
+                    command: up
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: ac_down
+            x: 163
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF078"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: aircon
+                    command: down
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: ac_timer
+            x: 54
+            y: 157
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Timer"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: aircon
+                    command: timer
+                    entity_id: remote.bedroom_ir
+        - button:
+            x: 126
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
+    - id: soundBar_page
+      widgets:
+        - button:
+            id: soundBar_power
+            x: 54
+            y: 22
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF011"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: soundbar
+                    command: power
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: soundBar_Bluetooth
+            x: 126
+            y: 22
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "BT"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: soundbar
+                    command: source_bluetooth
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: soundBar_TV
+            x: 17
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "TV"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: soundbar
+                    command: source_tv
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: soundBar_up
+            x: 90
+            y: 89
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF077"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: soundbar
+                    command: volume_up
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: sounrBar_down
+            x: 163
+            y: 89
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF078"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: soundbar
+                    command: volume_down
+                    entity_id: remote.bedroom_ir
+        - button:
+            id: soundbar_bass
+            x: 54
+            y: 157
+            width: 60
+            height: 60
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Bass"
+            on_click:
+              - homeassistant.service:
+                  service: remote.send_command
+                  data:
+                    num_repeats: "1"
+                    delay_secs: "0.4"
+                    hold_secs: "0"
+                    device: soundbar
+                    command: bass
+                    entity_id: remote.bedroom_ir
+        - button:
+            x: 126
+            y: 157
+            width: 60
+            height: 60
+            checkable: false
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
 display:
   - platform: ili9xxx
     model: GC9A01A #ST7789V
