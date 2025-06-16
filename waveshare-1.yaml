@@ -42,7 +42,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: ""
+    key: 
 
 ota:
   - platform: esphome
@@ -157,6 +157,8 @@ sensor:
   - platform: homeassistant
     id: room_thermostat
     entity_id: sensor.temperature_5
+    unit_of_measurement: "°C"
+    accuracy_decimals: 2
     on_value:
       - lvgl.label.update:
           id: screen_temp
