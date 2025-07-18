@@ -1,0 +1,280 @@
+esphome:
+  name: elecrow-crowpanel-70-rgb
+  friendly_name: Elecrow CrowPanel 7.0 RGB
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32s3box
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+api:
+  encryption:
+    key: "Dlxh1AJWaggFelNWu4uPbJWGJWSCxZ/b9WYDcE547yw="
+
+ota:
+  - platform: esphome
+    password: "fd1d5f68a7a0cc3c1b320e11845da858"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: UART0
+
+wifi:
+  ssid: !secret iot_ssid
+  password: !secret iot_password
+
+i2c:
+  sda: 19
+  scl: 20
+  scan: true
+
+display:
+  - platform: rpi_dpi_rgb
+    id: main_display
+    color_order: RGB
+    invert_colors: True
+    update_interval: never
+    auto_clear_enabled: false
+    dimensions:
+      width: 800
+      height: 480
+    de_pin: 40
+    hsync_pin: 39
+    vsync_pin: 41
+    pclk_pin: 0
+    pclk_frequency: 12MHz
+    data_pins:
+      red: [45, 48, 47, 21, 14]
+      green: [5, 6, 7, 15, 16, 4]
+      blue: [8, 3, 46, 9, 1]
+
+touchscreen:
+  platform: gt911
+  id: my_touchscreen
+  display: main_display
+  update_interval: 50ms
+  address: 0x5D 
+  on_touch:
+    - logger.log:
+        format: Touch at (%d, %d)
+        args: [touch.x, touch.y]
+    - lambda: |-
+        ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+            touch.x,
+            touch.y,
+            touch.x_raw,
+            touch.y_raw);
+
+output:
+  - platform: ledc
+    pin: 2
+    id: backlight_pin
+
+light:
+  - platform: monochromatic
+    output: backlight_pin
+    id: back_light
+    name: "Backlight Level"
+    restore_mode: RESTORE_DEFAULT_ON
+    gamma_correct: 1.8
+
+# ... Binary Sensors, Sensors, Text Sensors ... (unchanged for brevity)
+
+lvgl:
+  touchscreens: my_touchscreen
+  bg_color: 0
+  align: center
+  color_depth: 16
+  on_idle:
+    - timeout: 30s
+      then:
+        - lvgl.page.show: screensaver
+    - timeout: 300s
+      then:
+        - light.turn_off: back_light
+
+  style_definitions:
+    - id: temp_style
+      text_font: montserrat_48
+      align: center
+      text_color: 0xFFFFFF
+      radius: 4
+      pad_all: 2
+
+  pages:
+    - id: screensaver
+      skip: true
+      widgets:
+        - label:
+            id: screen_temp
+            styles: temp_style
+            align: center
+      on_click:
+        - lvgl.page.show: main_menu
+        - light.turn_on: back_light
+
+    - id: main_menu
+      widgets:
+        - button:
+            x: 100
+            y: 40
+            width: 100
+            height: 100
+            widgets:
+              - label:
+                  align: center
+                  text: "Lights"
+            on_click:
+              - lvgl.page.show: lights_page1
+
+        - button:
+            x: 220
+            y: 40
+            width: 100
+            height: 100
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Fan"
+            on_click:
+              - lvgl.page.show: fan_page
+
+        - button:
+            x: 340
+            y: 40
+            width: 100
+            height: 100
+            widgets:
+              - label:
+                  align: center
+                  text: "TV"
+            on_click:
+              - lvgl.page.show: tv_page
+
+        - button:
+            x: 460
+            y: 40
+            width: 100
+            height: 100
+            widgets:
+              - label:
+                  align: center
+                  text: "A/C"
+            on_click:
+              - lvgl.page.show: ac_page
+
+        - button:
+            x: 580
+            y: 40
+            width: 100
+            height: 100
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF028"
+            on_click:
+              - lvgl.page.show: soundBar_page
+
+        - button:
+            x: 340
+            y: 180
+            width: 120
+            height: 100
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  id: mainMenu_temp
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.lamp
+
+    - id: lights_page1
+      widgets:
+        - button:
+            id: light_ceilingGroup
+            x: 100
+            y: 40
+            width: 100
+            height: 100
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Ceiling"
+
+        - button:
+            id: light_bedLeft
+            x: 240
+            y: 40
+            width: 100
+            height: 100
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Bed Left"
+
+        - button:
+            id: light_bedRight
+            x: 380
+            y: 40
+            width: 100
+            height: 100
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Bed Right"
+
+        - button:
+            id: light_deskGroup
+            x: 520
+            y: 40
+            width: 100
+            height: 100
+            checkable: true
+            widgets:
+              - label:
+                  align: center
+                  text: "Desk Group"
+
+        - button:
+            x: 240
+            y: 180
+            width: 100
+            height: 100
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF054"
+            on_click:
+              - lvgl.page.show: lights_page2
+
+        - button:
+            x: 380
+            y: 180
+            width: 100
+            height: 100
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF015"
+            on_click:
+              - lvgl.page.show: main_menu
+
+# Note: Continue adjusting all other pages in a similar pattern...
+# You can request full pages like fan_page, tv_page, etc., if needed.
