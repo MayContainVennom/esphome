@@ -1,31 +1,21 @@
 substitutions:
   devicename: waveshare_1
   friendname: waveshare_1
-# Change the timezone to suit your location, or even just remove it - it will likely be picked up automatically
   timez: Europe/London
   board: esp32-s3-devkitc-1
-# Display state on initial start
-# Note that the screensaver only starts after the first touch of the display
-# Change to ALWAYS_OFF if want the screen to be off after booting, ALWAYS_ON if want it on at start eg for initial troubleshooting
   screenstart: ALWAYS_ON
-# Timeout for the screen
   screensaver: 5 min
-#GPIO pins for the LCD screen
   repin: GPIO14
   dcpin: GPIO8
-# Note - you may see an error on compilation "WARNING GPIO2 is a Strapping PIN and should be avoided" - ignore this as you have no choice
-# This error message may be removed via the "ignore_strapping_warning" option for the screen driver
-  bkpin: GPIO2 # was 2 two
+  bkpin: GPIO2
   clpin: GPIO10
   mopin: GPIO11
   mipin: GPIO12
   cspin: GPIO09
-# GPIO pins for the touch screen
   sdapin: GPIO6
   sclpin: GPIO7
   intpin: GPIO5  
   rstpin: GPIO13
-
 
 esphome:
   name: $devicename
@@ -36,13 +26,11 @@ esp32:
   framework:
     type: arduino
 
-# Enable logging
 logger:
 
-# Enable Home Assistant API
 api:
   encryption:
-    key: 
+    key: "aFnY1qXaJIL9pfCYX/ohowAJDUJMhIo4Sgu5YzooEvY="
 
 ota:
   - platform: esphome
@@ -52,15 +40,12 @@ wifi:
   ssid: !secret iot_ssid
   password: !secret iot_password
 
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Round-Touchscreen"
     password: password
 
+  use_address: 10.0.30.244
 captive_portal:
-
-
-# BINARY SENSORS
 
 binary_sensor:
   - platform: homeassistant
@@ -153,19 +138,22 @@ binary_sensor:
           id: fan_toggle
           state:
             checked: !lambda return x;
+
 sensor:
   - platform: homeassistant
     id: room_thermostat
-    entity_id: sensor.temperature_5
-    unit_of_measurement: "°C"
-    accuracy_decimals: 2
+    entity_id: sensor.bedroom_bedroom_temperature
     on_value:
       - lvgl.label.update:
           id: screen_temp
-          text: !lambda return id(room_thermostat_text).state;
+          text:
+            format: "%.1f°C"
+            args: ['x']
       - lvgl.label.update:
           id: mainMenu_temp
-          text: !lambda return id(room_thermostat_text).state;
+          text:
+            format: "%.1f°C"
+            args: ['x']
 
 text_sensor:
   - platform: wifi_info
@@ -174,29 +162,22 @@ text_sensor:
   - platform: homeassistant
     id: room_thermostat_text
     entity_id: sensor.temperature_44
+
 spi:
   mosi_pin: $mopin
   clk_pin: $clpin
   miso_pin: $mipin
-# Don't use software - makes it crawl  
-#  force_sw: True
-#mosi = Master Out Slave In
-#miso = Master In Slave Out or fermented bean paste. In this case, most likely the former rather than the latter. Doesn't matter as not used.
 
 i2c:
   sda: $sdapin
   scl: $sclpin
   id: i2c_touch
-  #Following helped someone get rid of the "Components should block" error messages but didn't for me
-  #frequency: 400kHz
 
-# Define a PWM output on the ESP32
 output:
   - platform: ledc
     pin: $bkpin
     id: backlight_pwm
 
-# Define a monochromatic, dimmable light for the backlight
 light:
   - platform: monochromatic
     output: backlight_pwm
@@ -204,21 +185,22 @@ light:
     id: back_light
     restore_mode: ALWAYS_ON
 
-# Optional: Add a simple display test
-
+# UPDATED: Changed platform from cst816 to cst820
 touchscreen:
-  platform: cst816
-  id: my_touchscreen
-  interrupt_pin: $intpin
-  reset_pin: $rstpin
-  on_touch:
-    - lambda: |-
-          ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+  - platform: cst816
+    id: my_touchscreen
+    i2c_id: i2c_touch
+    interrupt_pin: $intpin
+    reset_pin: $rstpin
+    on_touch:
+      - lambda: |-
+          ESP_LOGI("touch",
+              "x=%d, y=%d, x_raw=%d, y_raw=%d",
               touch.x,
               touch.y,
               touch.x_raw,
               touch.y_raw
-              );
+          );
 
 lvgl:
   touchscreens: my_touchscreen
@@ -234,10 +216,10 @@ lvgl:
         - light.turn_off: back_light
 
   style_definitions:
-    - id: temp_style      # choose an ID for your definition
+    - id: temp_style
       text_font: montserrat_48
       align: center
-      text_color: 0xFFFFFF
+      text_color: 0xFF0000
       radius: 4
       pad_all: 2  
   pages:
@@ -324,8 +306,8 @@ lvgl:
                   align: center
                   id: mainMenu_temp
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.lamp
     - id: lights_page1
@@ -342,8 +324,8 @@ lvgl:
                   align: center
                   text: "Ceiling"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.ceiling_group
         - button:
@@ -358,8 +340,8 @@ lvgl:
                   align: center
                   text: "Bed Left"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.lamp_nc
         - button:
@@ -374,8 +356,8 @@ lvgl:
                   align: center
                   text: "Bed Right"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.lamp
         - button:
@@ -389,8 +371,8 @@ lvgl:
                   align: center
                   text: "Scenes"
             on_click:
-              - homeassistant.service:
-                  service: input_select.bedroom_room_scenes
+              - homeassistant.action:
+                  action: input_select.bedroom_room_scenes
                   data:
                     action:
                       input_select.select_next
@@ -406,8 +388,8 @@ lvgl:
                   align: center
                   text: "Desk Group"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.desk_lights
         - button:
@@ -448,8 +430,8 @@ lvgl:
                   align: center
                   text: "D Left"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.left
         - button:
@@ -464,8 +446,8 @@ lvgl:
                   align: center
                   text: "D Right"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.right
         - button:
@@ -480,8 +462,8 @@ lvgl:
                   align: center
                   text: "TV"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.hue_gradient_lightstrip_1
         - button:
@@ -496,8 +478,8 @@ lvgl:
                   align: center
                   text: "Skadis"
             on_click:
-              - homeassistant.service:
-                  service: light.toggle
+              - homeassistant.action:
+                  action: light.toggle
                   data:
                     entity_id: light.light_strip
         - button:
@@ -538,8 +520,8 @@ lvgl:
                   align: center
                   text: "Toggle"
             on_click:
-              - homeassistant.service:
-                  service: fan.toggle
+              - homeassistant.action:
+                  action: fan.toggle
                   data:
                     entity_id: fan.sonoff_1000cc2152
         - button:
@@ -554,8 +536,8 @@ lvgl:
                   align: center
                   text: "AP"
             on_click:
-              - homeassistant.service:
-                  service: button.press
+              - homeassistant.action:
+                  action: button.press
                   data:
                     entity_id: button.uppatvind_button
         - button:
@@ -570,8 +552,8 @@ lvgl:
                   align: center
                   text: "Low"
             on_click:
-              - homeassistant.service:
-                  service: fan.set_preset_mode
+              - homeassistant.action:
+                  action: fan.set_preset_mode
                   data:
                     entity_id: fan.sonoff_1000cc2152
                     preset_mode: low
@@ -587,8 +569,8 @@ lvgl:
                   align: center
                   text: "Medium"
             on_click:
-              - homeassistant.service:
-                  service: fan.set_preset_mode
+              - homeassistant.action:
+                  action: fan.set_preset_mode
                   data:
                     entity_id: fan.sonoff_1000cc2152
                     preset_mode: medium
@@ -604,8 +586,8 @@ lvgl:
                   align: center
                   text: "High"
             on_click:
-              - homeassistant.service:
-                  service: fan.set_preset_mode
+              - homeassistant.action:
+                  action: fan.set_preset_mode
                   data:
                     entity_id: fan.sonoff_1000cc2152
                     preset_mode: high
@@ -635,8 +617,8 @@ lvgl:
                   align: center
                   text: "\uF011"
             on_click:
-              - homeassistant.service:
-                  service: script.tvtogglemain
+              - homeassistant.action:
+                  action: script.tvtogglemain
         - button:
             id: tv_enter
             x: 126
@@ -649,8 +631,8 @@ lvgl:
                   align: center
                   text: "\uF8A2"
             on_click:
-              - homeassistant.service:
-                  service: webostv.button
+              - homeassistant.action:
+                  action: webostv.button
                   data:
                     entity_id: media_player.seans_tv_2
                     button: ENTER
@@ -666,8 +648,8 @@ lvgl:
                   align: center
                   text: "\uF027"
             on_click:
-              - homeassistant.service:
-                  service: webostv.button
+              - homeassistant.action:
+                  action: webostv.button
                   data:
                     entity_id: media_player.seans_tv_2
                     button: VOLUMEDOWN
@@ -683,8 +665,8 @@ lvgl:
                   align: center
                   text: "\uF028"
             on_click:
-              - homeassistant.service:
-                  service: webostv.button
+              - homeassistant.action:
+                  action: webostv.button
                   data:
                     entity_id: media_player.seans_tv_2
                     button: VOLUMEUP
@@ -700,8 +682,8 @@ lvgl:
                   align: center
                   text: "\uF026"
             on_click:
-              - homeassistant.service:
-                  service: webostv.button
+              - homeassistant.action:
+                  action: webostv.button
                   data:
                     entity_id: media_player.seans_tv_2
                     button: MUTE
@@ -732,8 +714,8 @@ lvgl:
                   align: center
                   text: "\uF011"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -753,8 +735,8 @@ lvgl:
                   align: center
                   text: "FS"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -774,8 +756,8 @@ lvgl:
                   align: center
                   text: "\uF021"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -795,8 +777,8 @@ lvgl:
                   align: center
                   text: "\uF077"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -816,8 +798,8 @@ lvgl:
                   align: center
                   text: "\uF078"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -837,8 +819,8 @@ lvgl:
                   align: center
                   text: "Timer"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -872,8 +854,8 @@ lvgl:
                   align: center
                   text: "\uF011"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -893,8 +875,8 @@ lvgl:
                   align: center
                   text: "BT"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -914,8 +896,8 @@ lvgl:
                   align: center
                   text: "TV"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -935,8 +917,8 @@ lvgl:
                   align: center
                   text: "\uF077"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -956,8 +938,8 @@ lvgl:
                   align: center
                   text: "\uF078"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -977,8 +959,8 @@ lvgl:
                   align: center
                   text: "Bass"
             on_click:
-              - homeassistant.service:
-                  service: remote.send_command
+              - homeassistant.action:
+                  action: remote.send_command
                   data:
                     num_repeats: "1"
                     delay_secs: "0.4"
@@ -998,9 +980,10 @@ lvgl:
                   text: "\uF015"
             on_click:
               - lvgl.page.show: main_menu
+
 display:
   - platform: ili9xxx
-    model: GC9A01A #ST7789V
+    model: GC9A01A
     dc_pin: $dcpin
     reset_pin: $repin
     cs_pin: $cspin
@@ -1008,7 +991,6 @@ display:
     auto_clear_enabled: false
     update_interval: never
     id: main_display
- #   show_test_card: true
     dimensions: 
       height: 240
       width: 240
